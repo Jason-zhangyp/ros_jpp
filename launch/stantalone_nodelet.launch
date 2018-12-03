@@ -1,0 +1,13 @@
+<?xml version ="1.0"?>
+<launch>
+    <arg name="bagfile" default="$(find ros_jpp)/data/2018-11-22-14-54-09.bag"/>
+    <arg name="calibration" default="$(find velodyne_pointcloud)/params/VLP16db.yaml"/>
+    <arg name="max_range" default="15.0"/>
+    <arg name="min_range" default="1.0"/>
+    <node name="rosbag_play_node" pkg="rosbag" type="play" args="-l $(arg bagfile)"/>
+    <node pkg="velodyne_pointcloud" type="cloud_node" name="cloud_node">
+        <param name="calibration" value="$(arg calibration)"/>
+        <param name="max_range" value="$(arg max_range)"/>
+        <param name="min_range" value="$(arg min_range)"/>
+    </node>
+</launch>
