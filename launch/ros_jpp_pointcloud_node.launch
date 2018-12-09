@@ -2,6 +2,6 @@
 <launch>
   <node name="ros_jpp_pointcloud_node" pkg="ros_jpp" type="ros_jpp_pointcloud_node" output="screen">
     <param name="max_pts" value="4000"/>
-    <remap from="velodyne_points" to="velodyne_top_driver/velodyne_points"/>
+    <!--remap from="velodyne_points" to="velodyne_top_driver/velodyne_points"/-->
   </node>
 </launch>

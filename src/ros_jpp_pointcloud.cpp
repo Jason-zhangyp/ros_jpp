@@ -4,6 +4,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include "ros_jpp/point_types.h"
+#include <iterator>
+#include <cxutils/Timer.h>
 
 class JROS_PointCloud
 {
@@ -45,7 +47,6 @@ class JROS_PointCloud
                             , &JROS_PointCloud::cbPC2Arrived, this);
         }
     }
-
     ///convert from ROS pointcloud msg to jaus range sensor msg
     static void fromROSPointCloud2(Point3D::List* scan
       , const sensor_msgs::PointCloud2ConstPtr& pc2, const size_t& k_max_pts)
@@ -54,10 +55,9 @@ class JROS_PointCloud
       pcl_conversions::toPCL(*pc2,pcl_pc2);
       pcl::PointCloud<VPoint> pcl_pc;
       pcl::fromPCLPointCloud2(pcl_pc2,pcl_pc);
-      const size_t raw_pts = pcl_pc.size();
-      const size_t npts = raw_pts > k_max_pts ? k_max_pts : raw_pts;
-      scan->reserve(npts);
-      for (int i=0;i<npts;++i)
+      const auto raw_pts = pcl_pc.size();
+      scan->reserve(raw_pts);
+      for (int i=0;i<raw_pts;++i)
       {
           //only show pts of ring 29-35
           //if (abs(pcl_pc.points[i].ring - 32) > 10)
@@ -74,23 +74,56 @@ class JROS_PointCloud
     }
 
   protected:
+
     virtual void cbPC2Arrived(const sensor_msgs::PointCloud2ConstPtr& pc2)
     {
         Point3D::List scan;
         //convert from ROS msg to JAUS msg
         fromROSPointCloud2(&scan, pc2, m_npts);
         //send to JAUS with sensor info
-        UShort sensorID = 0;
-        Point3D sensor_translation(0,0,0);
-        Point3D sensor_orientation(0,0,0);
-        m_range_sensor.SetCartesianRangeScan(sensorID
-                                            , sensor_translation
-                                            , sensor_orientation
-                                            , scan);
+        auto it1 = scan.cbegin();
+        auto it2 = scan.cbegin();
+        it2 = advance_nsteps(it2, scan.cend(), m_npts);
+        ROS_INFO_STREAM("max npts = "<<m_npts);
+        while (true)        
+        {
+          UShort sensorID = 0;
+          Point3D sensor_translation(0,0,0);
+          Point3D sensor_orientation(0,0,0);
+          Point3D::List data(it1,it2);
+          m_range_sensor.SetCartesianRangeScan(sensorID
+                                              , sensor_translation
+                                              , sensor_orientation
+                                              , data);
+          CxUtils::Timer::Pause(10);                      
+          ROS_INFO_STREAM("sending "<<data.size()<<" pts");
+          it1 = it2;
+          if (it1 == scan.cend())
+            break;
+          it2 = advance_nsteps(it2, scan.cend(), m_npts);
+        }
+
     }
     ros::NodeHandle m_nh,m_pn;
 
   private:
+    //using ConstItP3D = Point3D::List::const_iterator;
+    //ConstItP3D& advance_nsteps(ConstItP3D& b
+    //              , const ConstItP3D& e
+    //              , const size_t n)
+    template<class InputIterator>
+    InputIterator& advance_nsteps(InputIterator& b
+                                , const InputIterator& e
+                                , const size_t n)
+    {
+      for (auto i=0;i<n;++i)
+      {
+        if (b==e) break;
+        ++b;
+      }
+      return b;
+    }
+
     ros::Subscriber m_sub_pc2;
     Component m_component;
     RangeSensor m_range_sensor;
